@@ -39,6 +39,7 @@ public class RetrofitNetwork implements Network {
                 }
                 catch ( IOException e )
                 {
+                    System.out.println(e);
                     requestCallback.onFailed( new NetworkException( null, e ) );
                 }
             }
