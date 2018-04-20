@@ -3,6 +3,9 @@ package cosw.eci.edu.lab11;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -50,6 +53,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      */
     private static final int REQUEST_READ_CONTACTS = 0;
 
+    private Activity activity;
+
     /**
      * A dummy authentication store containing known user names and passwords.
      * TODO: remove after connecting to a real authentication system.
@@ -69,10 +74,25 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private View mProgressView;
     private View mLoginFormView;
 
+    //Acces token key
+    private String accessToken;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+        this.activity = this;
+        //ask if he has already logged in
+        SharedPreferences sharedPref = activity.getPreferences(Context.MODE_PRIVATE);
+        String defaultValue = getResources().getString(R.string.default_access_token);
+        accessToken = sharedPref.getString(getString(R.string.saved_access_token), defaultValue);
+        if(accessToken!= getResources().getString(R.string.default_access_token)){
+            System.out.println("------------------------------LOGEADO POR SEGUNDA VEZ");
+        }
+        else{
+            System.out.println("------------------------------LOGEADO POR PRIMERA VEZ");
+        }
+
         // Set up the login form.
         mEmailView = (AutoCompleteTextView) findViewById(R.id.email);
         populateAutoComplete();
@@ -176,13 +196,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
         // Check for a valid email address.
         if (TextUtils.isEmpty(email)) {
-                mEmailView.setError(getString(R.string.error_field_required));
-                focusView = mEmailView;
-                cancel = true;
-            } else if (!isEmailValid(email)) {
-                mEmailView.setError(getString(R.string.error_invalid_email));
-                focusView = mEmailView;
-                cancel = true;
+            mEmailView.setError(getString(R.string.error_field_required));
+            focusView = mEmailView;
+            cancel = true;
+        } else if (!isEmailValid(email)) {
+            mEmailView.setError(getString(R.string.error_invalid_email));
+            focusView = mEmailView;
+            cancel = true;
         }
 
         if (cancel) {
@@ -197,15 +217,34 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             //mAuthTask.execute((Void) null);
             retrofitNetwork.login(new LoginWrapper(email, password), new Network.RequestCallback<Token>() {
                 @Override
-                public void onSuccess(Token response) {
-                    showProgress(false);
-                    finish();
+                public void onSuccess(final Token response) {
+                    activity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(response!=null){
+                                showProgress(false);
+                                SharedPreferences sharedPref = activity.getPreferences(Context.MODE_PRIVATE);
+                                SharedPreferences.Editor editor = sharedPref.edit();
+                                editor.putString(getString(R.string.saved_access_token), response.getAccessToken());
+                                editor.commit();
+                                retrofitNetwork.addSecureTokenInterceptor(response.getAccessToken());
+                                //finish();
+                            }
+                            else{
+                                showProgress(false);
+                                mPasswordView.setError(getString(R.string.error_incorrect_password));
+                                mPasswordView.requestFocus();
+                            }
+
+
+
+                        }
+                    });
                 }
 
                 @Override
                 public void onFailed(NetworkException e) {
-                    mPasswordView.setError(getString(R.string.error_incorrect_password));
-                    mPasswordView.requestFocus();
+
                 }
             });
         }
